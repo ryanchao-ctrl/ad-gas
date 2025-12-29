@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+  <style>
+    :root { 
+      --bh-black: #282828; --bh-comm: #575757; --howhow-red: #DC281D;
+      --momo-pink: #E50081; --pchome-blue: #00609D; --shopee-orange: #E44A2B;
+      --primary: #2c3e50; --bg: #f4f7f6; --card-bg: #ffffff;
+      --fb-blue: #1877F2; --goog-green: #34A853;
+      --direct-purple: #8e44ad;
+    }
+    
+    * { box-sizing: border-box; }
+    body { font-family: 'Noto Sans TC', sans-serif; background: var(--bg); margin: 0; padding: 10px; color: var(--primary); width: 100%; overflow-x: hidden; }
+    .container { max-width: 1200px; margin: 0 auto; width: 100%; }
+
+    /* ★ 明顯的 Loading 遮罩樣式 ★ */
+    .loader-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(255, 255, 255, 0.95); /* 半透明白底 */
+      z-index: 9999;
+      display: none; /* 預設隱藏，由 JS 控制顯示 */
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      backdrop-filter: blur(5px);
+    }
+    .spinner {
+      width: 60px;
+      height: 60px;
+      border: 6px solid #e0e0e0;
+      border-top: 6px solid #2c3e50; /* 深藍色轉動條 */
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    .loading-text {
+      font-size: 18px;
+      font-weight: 900;
+      color: #2c3e50;
+      letter-spacing: 1px;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+
+    header { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; background: var(--card-bg); padding: 15px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+    @media (min-width: 768px) { header { flex-direction: row; justify-content: space-between; align-items: center; } }
+    h1 { font-size: 20px; font-weight: 900; margin: 0; display: flex; align-items: center; gap: 10px; color: #333; }
+    .version-tag { background: #e74c3c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 900; }
+    select { padding: 8px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; outline: none; cursor: pointer; width: 100%; }
+    @media (min-width: 768px) { select { width: auto; } }
+
+    .card { background: var(--card-bg); padding: 15px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); margin-bottom: 15px; position: relative; min-width: 0; width: 100%; }
+    @media (min-width: 768px) { .card { padding: 20px; } }
+    
+    .card h3 { margin: 0 0 15px 0; font-size: 18px; color: #2c3e50; font-weight: 900; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.5px; }
+
+    .stats-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px; }
+    @media (min-width: 768px) { .stats-grid { grid-template-columns: 1fr 1fr; } }
+
+    .big-stat { font-size: 32px; font-weight: 900; color: #2c3e50; line-height: 1.1; letter-spacing: -0.5px; margin-bottom: 8px; word-wrap: break-word; }
+    @media (min-width: 768px) { .big-stat { font-size: 46px; } }
+    
+    .sub-stat { font-size: 14px; color: #666; font-weight: 700; }
+    .highlight { color: #e67e22; font-weight: 900; }
+
+    .health-bar-bg { height: 12px; background: #eee; border-radius: 6px; overflow: hidden; margin-top: 10px; position: relative; }
+    .health-bar-fill { height: 100%; background: #27ae60; width: 0%; transition: width 1s; position: relative; }
+    .health-bar-fill::after { content: ""; position: absolute; top: 0; left: 0; bottom: 0; right: 0; background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%); transform: skewX(-20deg) translateX(-150%); animation: shimmer 2.5s infinite; }
+    @keyframes shimmer { 100% { transform: skewX(-20deg) translateX(250%); } }
+    .health-info { display: flex; justify-content: space-between; font-size: 13px; margin-top: 6px; color: #666; font-weight: bold; }
+
+    .breakdown-box { margin-top: 15px; padding-top: 15px; border-top: 1px dashed #eee; }
+    .item-row { margin-bottom: 6px; font-size: 12px; color: #555; font-weight: bold; display: flex; align-items: center; justify-content: space-between; }
+    .item-label { width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-bar-bg { flex: 1; height: 6px; background: #eee; border-radius: 3px; margin: 0 8px; overflow: hidden; }
+    .item-bar-fill { height: 100%; border-radius: 3px; width: 0%; transition: width 1s; }
+    .item-value { width: 100px; text-align: right; font-size: 11px; }
+
+    .charts-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px; }
+    @media (min-width: 900px) { .charts-grid { grid-template-columns: 1fr 1fr; } }
+    .chart-container { position: relative; height: 300px; min-height: 300px; width: 100%; } 
+    canvas { width: 100% !important; height: 100% !important; }
+    .show-more-btn { width: 100%; padding: 10px; margin-top: 10px; background: #fff; border: 1px solid #ddd; color: #666; border-radius: 6px; cursor: pointer; }
+
+    .ai-grid { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 15px; }
+    @media (min-width: 900px) { .ai-grid { grid-template-columns: 1fr 1fr; } }
+    .ai-card { background: #f8f9fa; border-left: 4px solid #2c3e50; padding: 20px; border-radius: 8px; font-size: 14px; line-height: 1.6; word-wrap: break-word; }
+    .ai-card h4 { margin: 0 0 10px 0; color: #2c3e50; font-size: 16px; border-bottom: 2px solid #ddd; padding-bottom: 8px; font-weight: 900; }
+    .ai-card b { color: #c0392b; font-weight: 900; }
+    .ai-card ul { padding-left: 20px; margin: 0; }
+    .ai-card li { margin-bottom: 6px; }
+    .ai-btn { width: 100%; padding: 12px; background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 15px; cursor: pointer; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 3px 6px rgba(0,0,0,0.1); }
+
+    #zeroSalesBox { border-left: 5px solid #e74c3c; background: #fff5f5; display: none; }
+    #zeroSalesList { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .zero-tag { background: #e74c3c; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+<!-- ★ 明顯的 Loading 區塊 -->
+<div class="loader-overlay" id="loader">
+  <div class="spinner"></div>
+  <div class="loading-text">正在連結外部數據庫...</div>
+</div>
+
+<div class="container">
+  <header>
+    <h1>📊 2025/26 廣告行銷中心 <span class="version-tag">V1.8</span></h1>
+    <select id="sheetSelect" onchange="fetchData(this.value)">
+      <option>載入中...</option>
+    </select>
+  </header>
+
+  <div class="stats-grid">
+    <div class="card">
+      <h3>總預算 (TOTAL BUDGET)</h3>
+      <div class="big-stat" id="totalPlanned">---</div>
+      <div class="health-bar-bg">
+        <div class="health-bar-fill" id="healthBar"></div>
+      </div>
+      <div class="health-info">
+        <span id="spendText">已用: ---</span>
+        <span id="remainBudget" style="color:#27ae60">剩餘: ---</span>
+      </div>
+      <div class="breakdown-box" id="budgetBreakdown"></div>
+    </div>
+
+    <div class="card">
+      <h3>本月總業績 (REVENUE)</h3>
+      <div class="big-stat" id="totalRevenue">---</div>
+      <div class="sub-stat">全站 ROAS: <span class="highlight" id="totalROAS">---</span></div>
+      <div class="breakdown-box" id="revBreakdown"></div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="card">
+      <h3>主力產品佈局｜通路 (CHANNEL)</h3>
+      <div class="chart-container" id="stackContainer"><canvas id="stackedChart"></canvas></div>
+      <button class="show-more-btn" id="showMoreBtn" onclick="toggleShowMore()">🔽 展開全部</button>
+    </div>
+    <div class="card">
+      <h3>主力產品佈局｜目標 (OBJECTIVE)</h3>
+      <div class="chart-container" id="objStackContainer"><canvas id="objStackedChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>廣告效能矩陣 (AD SPEND vs SALES)</h3>
+    <div class="chart-container" style="height: 350px;"><canvas id="scatterChart"></canvas></div>
+  </div>
+
+  <div class="card" id="zeroSalesBox">
+    <h3>⚠️ 零銷量警示 (ZERO SALES ALERT)</h3>
+    <div style="font-size:13px; color:#7f8c8d;">以下產品有投放預算 (>$0) 但外部表顯示銷量為 0 (已排除活動與品牌字)：</div>
+    <div id="zeroSalesList"></div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="card">
+      <h3>通路投入產出 (ROAS)</h3>
+      <div class="chart-container"><canvas id="channelChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>各平台投資報酬率 (PLATFORM ROAS)</h3>
+      <div class="chart-container" style="height:250px; min-height:250px;"><canvas id="platformROASChart"></canvas></div>
+    </div>
+  </div>
+
+  <button class="ai-btn" onclick="callAI()" id="aiBtn">✨ 啟動 Gemini 摘要分析</button>
+  <div class="ai-grid" id="aiSection" style="display:none;">
+    <div class="ai-card"><h4>投放架構摘要</h4><div id="aiStrategyContent">分析中...</div></div>
+    <div class="ai-card"><h4>營運成效診斷</h4><div id="aiPerformanceContent">分析中...</div></div>
+  </div>
+</div>
+
+<script>
+Chart.register(ChartDataLabels);
+let charts = {};
+let allProductData = [];
+let isExpanded = false;
+let currentSheet = '';
+
+const COLORS = { ecom: '#2980b9', brand: '#2c3e50', revenue: '#f39c12' };
+const PROD_COLORS = { 'i-BH':'#282828', 'BH商用':'#575757', '好好運動':'#DC281D', 'MOMO':'#E50081', 'PChome':'#00609D', '蝦皮':'#E44A2B', '其他':'#95a5a6' };
+
+window.onload = () => {
+  document.getElementById('loader').style.display = 'flex';
+  google.script.run.withSuccessHandler(init).withFailureHandler(err => alert(err)).getAvailableSheets();
+};
+
+function init(res) {
+  const sel = document.getElementById('sheetSelect');
+  sel.innerHTML = '';
+  if (!res.sheets || res.sheets.length === 0) { sel.add(new Option("無資料", "")); return; }
+  res.sheets.forEach(s => sel.add(new Option(s, s)));
+  // 預設選取第一個並載入
+  fetchData(res.sheets[0]);
+}
+
+function fetchData(sheetName) {
+  currentSheet = sheetName;
+  document.getElementById('loader').style.display = 'flex';
+  document.getElementById('aiSection').style.display = 'none';
+  document.getElementById('aiBtn').disabled = false;
+  document.getElementById('aiBtn').innerText = '✨ 啟動 Gemini 摘要分析';
+  isExpanded = false;
+  document.getElementById('showMoreBtn').innerText = '🔽 展開全部';
+  document.getElementById('stackContainer').style.height = '350px';
+  document.getElementById('objStackContainer').style.height = '350px';
+
+  google.script.run.withSuccessHandler(render).withFailureHandler(err => {
+    document.getElementById('loader').style.display = 'none';
+    alert("數據載入失敗: " + err.message);
+  }).getSheetData(sheetName);
+}
+
+function render(res) {
+  document.getElementById('loader').style.display = 'none';
+  if(res.error) { alert(res.error); return; }
+
+  const ad = res.adData;
+  const rev = res.revenueData;
+  const ext = res.externalData; 
+  allProductData = ad.allProducts;
+
+  try {
+    const totalPlanned = Math.round(ad.plannedBudget);
+    const actualSpend = Math.round(ad.actualSpend);
+    const totalRevenue = Math.round(rev.total);
+    const remain = totalPlanned - actualSpend;
+    const usagePct = totalPlanned > 0 ? Math.round((actualSpend / totalPlanned) * 100) : 0;
+    const totalROAS = actualSpend > 0 ? (rev.total / actualSpend).toFixed(1) : "0.0";
+
+    document.getElementById('totalPlanned').innerText = '$' + totalPlanned.toLocaleString();
+    document.getElementById('spendText').innerText = `已用: $${actualSpend.toLocaleString()} (${usagePct}%)`;
+    document.getElementById('remainBudget').innerText = '剩餘: $' + remain.toLocaleString();
+    document.getElementById('totalRevenue').innerText = '$' + totalRevenue.toLocaleString();
+    document.getElementById('totalROAS').innerText = totalROAS;
+
+    const bar = document.getElementById('healthBar');
+    bar.style.width = Math.min(usagePct, 100) + '%';
+    if(usagePct > 100) bar.style.background = '#8e44ad';
+    else if(usagePct > 90) bar.style.background = '#e74c3c';
+    else if(usagePct > 75) bar.style.background = '#f39c12';
+    else bar.style.background = '#27ae60';
+
+    renderBreakdown('budgetBreakdown', ad.objectives, ad.plannedBudget);
+    renderRevBreakdown(rev, ext); 
+    renderZeroSalesAlert(allProductData);
+    
+  } catch(e) { console.error("數字渲染錯誤", e); }
+
+  try {
+    renderStackedChart(allProductData.slice(0, 10));
+    renderObjStackedChart(allProductData.slice(0, 10));
+    renderScatterChart(allProductData); 
+    renderChannelChart(ad, rev);
+    renderPlatformROASChart(ad.destinations, ext, rev);
+  } catch(e) { console.error("圖表渲染錯誤", e); }
+}
+
+function renderZeroSalesAlert(products) {
+  const box = document.getElementById('zeroSalesBox');
+  const list = document.getElementById('zeroSalesList');
+  list.innerHTML = '';
+  
+  const ignoreList = [
+    "商用", "活動", "系列", "品牌", "競品", "表單", "官網", 
+    "廣告", "BH /", "寫手", "曝光", "聯名", "出清"
+  ];
+
+  const zeroProds = products.filter(p => {
+    let cost = p.extSpend || p.total;
+    if (cost <= 0 || p.salesVolume > 0) return false;
+    let isIgnored = ignoreList.some(keyword => p.name.includes(keyword));
+    return !isIgnored;
+  });
+
+  if (zeroProds.length > 0) {
+    box.style.display = 'block';
+    zeroProds.forEach(p => {
+      let tag = document.createElement('div');
+      tag.className = 'zero-tag';
+      let cost = Math.round(p.extSpend || p.total).toLocaleString();
+      tag.innerText = `${p.name} ($${cost})`;
+      list.appendChild(tag);
+    });
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+function renderBreakdown(containerId, dataObj, totalVal) {
+  const box = document.getElementById(containerId);
+  box.innerHTML = '';
+  const entries = Object.entries(dataObj).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  let maxVal = entries.length > 0 ? entries[0][1] : 0;
+
+  entries.forEach(([key, val]) => {
+    let barWidth = maxVal > 0 ? (val / maxVal) * 100 : 0;
+    let pctText = totalVal > 0 ? Math.round((val / totalVal) * 100) : 0;
+    let color = '#95a5a6';
+    if(key.includes('轉換')) color = '#e74c3c';
+    if(key.includes('流量')) color = '#3498db';
+    if(key.includes('關鍵字')) color = '#f1c40f';
+    if(key.includes('最高成效')) color = '#8e44ad';
+
+    let html = `
+      <div class="item-row">
+        <span class="item-label">${key}</span>
+        <div class="item-bar-bg"><div class="item-bar-fill" style="width:${barWidth}%; background:${color}"></div></div>
+        <span class="item-value">$${Math.round(val).toLocaleString()} (${pctText}%)</span>
+      </div>`;
+    box.innerHTML += html;
+  });
+}
+
+function renderRevBreakdown(rev, ext) {
+  const box = document.getElementById('revBreakdown');
+  box.innerHTML = '';
+  let items = [];
+
+  if (ext && ext.Found) {
+    items = [
+      { name: 'MOMO', val: ext.MOMO, color: '#E50081' },
+      { name: 'PChome', val: ext.PChome, color: '#00609D' },
+      { name: '蝦皮', val: ext.Shopee, color: '#E44A2B' },
+      { name: 'BH官網', val: ext.Official_BH, color: '#2c3e50' },
+      { name: '好好運動', val: ext.Official_How, color: '#DC281D' },
+      { name: '門市', val: rev.store, color: '#555' }
+    ];
+  } else {
+    items = [
+      { name: '直營電商', val: rev.ecom, color: '#2980b9' },
+      { name: '直營門市', val: rev.store, color: '#2c3e50' },
+      { name: '達康經銷', val: rev.distributor, color: '#95a5a6' }
+    ];
+  }
+  items.sort((a,b) => b.val - a.val);
+  
+  let totalRev = rev.total;
+  let maxVal = items.length > 0 ? items[0].val : 0;
+
+  items.forEach(item => {
+    let barWidth = maxVal > 0 ? (item.val / maxVal) * 100 : 0;
+    let pct = totalRev > 0 ? Math.round((item.val / totalRev) * 100) : 0;
+
+    let html = `
+      <div class="item-row">
+        <span class="item-label">${item.name}</span>
+        <div class="item-bar-bg"><div class="item-bar-fill" style="width:${barWidth}%; background:${item.color}"></div></div>
+        <span class="item-value">$${Math.round(item.val).toLocaleString()} <span style="font-size:10px;color:#999">(${pct}%)</span></span>
+      </div>`;
+    box.innerHTML += html;
+  });
+}
+
+function renderScatterChart(products) {
+  const ctx = document.getElementById('scatterChart').getContext('2d');
+  if (charts['scatter']) charts['scatter'].destroy();
+
+  const validProds = products.filter(p => (p.salesVolume > 0 || (p.extSpend && p.extSpend > 0) || p.total > 1000));
+
+  charts['scatter'] = new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: validProds.map(p => ({
+        label: p.name,
+        data: [{ x: p.extSpend || p.total, y: p.salesVolume || 0 }], 
+        backgroundColor: p.salesVolume > 50 ? '#e74c3c' : ((p.extSpend || p.total) > 20000 ? '#f39c12' : '#2980b9'),
+        pointRadius: 8,
+        pointHoverRadius: 10
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              let p = validProds[ctx.datasetIndex];
+              let cost = p.extSpend || p.total;
+              let mom = p.salesMoM ? Math.round(p.salesMoM * 100) : 0;
+              let sign = mom > 0 ? '+' : '';
+              return `${p.name}: $${cost.toLocaleString()} / ${p.salesVolume}台 (MoM ${sign}${mom}%)`;
+            }
+          }
+        },
+        datalabels: {
+          display: true, align: 'top',
+          formatter: (val, ctx) => ctx.chart.data.datasets[ctx.datasetIndex].label.substring(0, 5),
+          font: { size: 10 }, color: '#555'
+        }
+      },
+      scales: {
+        x: { title: { display: true, text: '廣告花費 (Cost)' }, beginAtZero: true, grid: { color: '#f0f0f0' } },
+        y: { title: { display: true, text: '銷售台數 (Volume)' }, beginAtZero: true, grid: { color: '#f0f0f0' } }
+      }
+    }
+  });
+}
+
+function renderChannelChart(ad, rev) {
+  const ctx = document.getElementById('channelChart').getContext('2d');
+  if (charts['channel']) charts['channel'].destroy();
+  const ecomROAS = ad.spend_ecom > 0 ? (rev.ecom / ad.spend_ecom).toFixed(1) : 0;
+  const brandROAS = ad.spend_brand > 0 ? (rev.store / ad.spend_brand).toFixed(1) : 0;
+  charts['channel'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: [`電商\n(${ecomROAS})`, `門市\n(${brandROAS})`, '達康'],
+      datasets: [
+        { label: '投入', data: [Math.round(ad.spend_ecom), Math.round(ad.spend_brand), 0], backgroundColor: '#bdc3c7', borderRadius: 4 },
+        { label: '產出', data: [Math.round(rev.ecom), Math.round(rev.store), Math.round(rev.distributor)], backgroundColor: [COLORS.ecom, COLORS.brand, COLORS.revenue], borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { datalabels: { anchor: 'end', align: 'top', formatter: (v) => v>0 ? '$'+Math.round(v/1000)+'k' : '', font: {size: 10} }, tooltip: { mode: 'index', intersect: false } },
+      scales: { y: { beginAtZero: true, grid: {color:'#f0f0f0'} }, x: { grid: {display:false} } }
+    }
+  });
+}
+
+function renderPlatformROASChart(adDest, extData, rev) {
+  const ctx = document.getElementById('platformROASChart').getContext('2d');
+  if (charts['platformROAS']) charts['platformROAS'].destroy();
+  
+  let platforms = [];
+  
+  if (extData && extData.Found) {
+    platforms.push({ name: 'MOMO', cost: adDest['MOMO'] || 0, rev: extData.MOMO });
+    platforms.push({ name: 'PChome', cost: adDest['PChome'] || 0, rev: extData.PChome });
+    platforms.push({ name: '蝦皮', cost: adDest['蝦皮'] || 0, rev: extData.Shopee });
+
+    let costPool = (adDest['i-BH']||0) + (adDest['BH商用']||0) + (adDest['好好運動']||0) + (adDest['直營門市']||0);
+    let revPool = extData.Official_BH + extData.Official_How + rev.store;
+
+    platforms.push({
+      name: '自營通路 (OMO)',
+      cost: costPool,
+      rev: revPool,
+      isDirect: true, 
+      breakdown: [
+        { name: '直營門市', val: rev.store },
+        { name: 'BH官網', val: extData.Official_BH },
+        { name: '好好運動', val: extData.Official_How }
+      ]
+    });
+
+  } else {
+    platforms = [
+      { name: '電商總體', cost: adDest['MOMO']+adDest['PChome']+adDest['蝦皮']+adDest['好好運動'] || 0, rev: rev.ecom }
+    ];
+  }
+
+  platforms.forEach(p => {
+    p.roas = p.cost > 0 ? (p.rev / p.cost) : 0;
+  });
+  platforms.sort((a,b) => b.roas - a.roas);
+
+  const labels = platforms.map(p => p.name);
+  const data = platforms.map(p => p.roas.toFixed(1));
+  const colors = platforms.map(p => {
+    if (p.isDirect) return '#8e44ad';
+    if (p.roas >= 5.0) return '#27ae60';
+    if (p.roas >= 2.0) return '#f39c12';
+    return '#e74c3c';
+  });
+
+  charts['platformROAS'] = new Chart(ctx, {
+    type: 'bar', 
+    data: { 
+      labels, 
+      datasets: [{ 
+        label: 'ROAS',
+        data, 
+        backgroundColor: colors, 
+        borderRadius: 4 
+      }] 
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        datalabels: { 
+          anchor: 'end', align: 'right', 
+          color: '#555', font: { weight: 'bold' },
+          formatter: (v) => v 
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              let p = platforms[ctx.dataIndex];
+              if (p.isDirect) {
+                let totalR = p.rev;
+                let lines = [
+                  `💎 綜合 ROAS: ${p.roas.toFixed(1)}`,
+                  `💰 總花費: $${p.cost.toLocaleString()} / 總營收: $${p.rev.toLocaleString()}`,
+                  `------------------------------`,
+                  `📊 業績貢獻來源:`
+                ];
+                p.breakdown.sort((a,b) => b.val - a.val).forEach(item => {
+                   let pct = totalR > 0 ? Math.round((item.val/totalR)*100) : 0;
+                   lines.push(` • ${item.name}: $${item.val.toLocaleString()} (${pct}%)`);
+                });
+                return lines;
+              } else {
+                return `ROAS: ${p.roas.toFixed(1)} (花費 $${p.cost.toLocaleString()} / 營收 $${p.rev.toLocaleString()})`;
+              }
+            }
+          }
+        }
+      },
+      scales: {
+        x: { display: false, beginAtZero: true },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderStackedChart(products) {
+  const ctx = document.getElementById('stackedChart').getContext('2d');
+  if (charts['stacked']) charts['stacked'].destroy();
+  const isMobile = window.innerWidth < 600;
+  const labels = products.map(p => p.name.substring(0, isMobile?8:12));
+  const destOrder = ['i-BH', 'BH商用', '好好運動', 'MOMO', 'PChome', '蝦皮', '其他'];
+  const datasets = destOrder.map(dest => ({
+    label: dest,
+    data: products.map(p => Math.round(p.breakdown[dest] || 0)),
+    backgroundColor: PROD_COLORS[dest] || '#95a5a6',
+    borderRadius: 4, barPercentage: 0.7
+  }));
+  charts['stacked'] = new Chart(ctx, {
+    type: 'bar', data: { labels, datasets },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'nearest', axis: 'y', intersect: false },
+      scales: { 
+        x: { 
+          stacked: true, display: true, grid: { color: '#f0f0f0' },
+          ticks: { font: { size: 10 }, color: '#999', callback: function(value) { return '$' + value/1000 + 'k'; } }
+        }, 
+        y: { stacked: true, grid: { display: false } } 
+      },
+      plugins: { legend: {display:false}, datalabels: {display:false} }
+    }
+  });
+}
+
+function renderObjStackedChart(products) {
+  const ctx = document.getElementById('objStackedChart').getContext('2d');
+  if (charts['objStacked']) charts['objStacked'].destroy();
+  const isMobile = window.innerWidth < 600;
+  const labels = products.map(p => p.name.substring(0, isMobile?8:12));
+  let allObjs = new Set();
+  products.forEach(p => Object.keys(p.objectiveBreakdown || {}).forEach(k => allObjs.add(k)));
+  const objOrder = Array.from(allObjs);
+  const datasets = objOrder.map(obj => {
+    let color = '#95a5a6';
+    if(obj.includes('轉換')) color = '#e74c3c';
+    if(obj.includes('流量')) color = '#3498db';
+    if(obj.includes('關鍵字')) color = '#f1c40f';
+    return {
+      label: obj,
+      data: products.map(p => Math.round(p.objectiveBreakdown[obj] || 0)),
+      backgroundColor: color,
+      borderRadius: 4, barPercentage: 0.7
+    };
+  });
+  charts['objStacked'] = new Chart(ctx, {
+    type: 'bar', data: { labels, datasets },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'nearest', axis: 'y', intersect: false },
+      scales: { 
+        x: { 
+          stacked: true, display: true, grid: { color: '#f0f0f0' },
+          ticks: { font: { size: 10 }, color: '#999', callback: function(value) { return '$' + value/1000 + 'k'; } }
+        }, 
+        y: { stacked: true, grid: { display: false } } 
+      },
+      plugins: { legend: {display:false}, datalabels: {display:false} }
+    }
+  });
+}
+
+function toggleShowMore() {
+  isExpanded = !isExpanded;
+  const btn = document.getElementById('showMoreBtn');
+  const c1 = document.getElementById('stackContainer');
+  const c2 = document.getElementById('objStackContainer');
+  if (isExpanded) {
+    btn.innerText = '🔼 收起';
+    let newH = Math.max(350, allProductData.length * 35) + 'px';
+    c1.style.height = newH;
+    c2.style.height = newH;
+    renderStackedChart(allProductData);
+    renderObjStackedChart(allProductData);
+  } else {
+    btn.innerText = '🔽 展開全部';
+    c1.style.height = '350px';
+    c2.style.height = '350px';
+    renderStackedChart(allProductData.slice(0, 10));
+    renderObjStackedChart(allProductData.slice(0, 10));
+  }
+}
+
+function callAI() {
+  const btn = document.getElementById('aiBtn');
+  const section = document.getElementById('aiSection');
+  btn.disabled = true;
+  btn.innerText = '🤖 分析運算中...';
+  google.script.run.withSuccessHandler(res => {
+    section.style.display = 'grid';
+    const parts = res.split('|||');
+    if (parts.length >= 2) {
+      document.getElementById('aiStrategyContent').innerHTML = parts[0];
+      document.getElementById('aiPerformanceContent').innerHTML = parts[1];
+    } else {
+      document.getElementById('aiStrategyContent').innerHTML = res;
+    }
+    btn.innerText = '✅ 分析完成';
+  }).askGeminiStrategy(currentSheet);
+}
+</script>
+</body>
+</html>
